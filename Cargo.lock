@@ -78,6 +78,17 @@ name = "ensemble-discovery"
 version = "0.1.0"
 
 [[package]]
+name = "ensemble-hub"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "ensemble-core",
+ "ensemble-discovery",
+ "ensemble-routing",
+ "tokio",
+]
+
+[[package]]
 name = "ensemble-manifest"
 version = "0.1.0"
 dependencies = [
@@ -101,9 +112,14 @@ dependencies = [
  "anyhow",
  "ensemble-client",
  "ensemble-core",
+ "ensemble-hub",
  "rosc",
  "tokio",
 ]
+
+[[package]]
+name = "ensemble-routing"
+version = "0.1.0"
 
 [[package]]
 name = "ensemble-values"

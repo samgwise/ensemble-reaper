@@ -79,6 +79,21 @@ impl FxEntry {
     }
 }
 
+/// Round-trip float values through f32 — REAPER's OSC wire precision.
+///
+/// Commands are seeded into the value cache at the precision REAPER echoes
+/// back (f32), so a bit-identical echo is suppressed even when the command
+/// originated as a full-precision f64 Ensemble value.
+pub fn to_wire_precision(value: Value) -> Value {
+    match value {
+        Value::Float(f) => Value::Float((f.value() as f32 as f64).into()),
+        Value::List(items) => Value::List(items.into_iter().map(to_wire_precision).collect()),
+        Value::Tuple(items) => Value::Tuple(items.into_iter().map(to_wire_precision).collect()),
+        Value::Map(m) => Value::Map(m.into_iter().map(|(k, v)| (k, to_wire_precision(v))).collect()),
+        other => other,
+    }
+}
+
 /// Cached FX state by (track, fx) slot, diffed against incoming feedback.
 #[derive(Default)]
 pub struct FxRegistry {
@@ -335,6 +350,16 @@ mod tests {
         cache.seed("/a", Value::Float(0.5.into()));
         assert!(!cache.check_and_store("/a", Value::Float(0.5.into())));
         assert!(cache.check_and_store("/a", Value::Float(0.6.into())));
+    }
+
+    #[test]
+    fn seeding_at_wire_precision_swallows_f32_echoes() {
+        let mut cache = ValueCache::new();
+        // Commanded as f64 0.9, seeded at f32 wire precision...
+        cache.seed("/a", to_wire_precision(Value::Float(0.9.into())));
+        // ...so the f32-widened echo (a different f64 bit pattern) is
+        // suppressed.
+        assert!(!cache.check_and_store("/a", Value::Float((0.9_f32 as f64).into())));
     }
 
     #[test]

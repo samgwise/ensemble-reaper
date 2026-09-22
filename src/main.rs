@@ -43,7 +43,7 @@ use ensemble_client::Hub;
 use ensemble_core::protocol::*;
 
 use reaper::ReaperMessage;
-use registry::{FxRegistry, RegistryUpdate, ValueCache};
+use registry::{to_wire_precision, FxRegistry, RegistryUpdate, ValueCache};
 use translate::{action_to_reaper, fx_info_address, reaper_to_action_parts, ENS_ROOT};
 
 // ---------------------------------------------------------------------------
@@ -216,10 +216,10 @@ async fn main() -> Result<()> {
     hub.subscribe(&format!("{ENS_ROOT}/**")).await?;
     eprintln!("Subscribed to: {ENS_ROOT}/**");
 
-    // Advertise capabilities.
-    hub.set_manifest(&build_manifest(&config.name)).await?;
-
-    // OSC sockets and tasks.
+    // OSC sockets and tasks. These must be ready before the manifest is
+    // published: the manifest event doubles as the bridge's readiness signal
+    // (e.g. for integration tests) — once /hub/manifest/updated arrives, the
+    // subscription is registered and the UDP ports are bound.
     let reaper_target: SocketAddr =
         format!("{}:{}", config.reaper_host, config.osc_send_port).parse()?;
     let send_socket = osc::bind_sender().await?;
@@ -230,6 +230,9 @@ async fn main() -> Result<()> {
         "UDP ready — commands → {reaper_target}, feedback on 127.0.0.1:{}",
         config.osc_listen_port
     );
+
+    // Advertise capabilities.
+    hub.set_manifest(&build_manifest(&config.name)).await?;
 
     let mut registry = FxRegistry::new();
     let mut cache = ValueCache::new();
@@ -271,11 +274,13 @@ async fn main() -> Result<()> {
                 };
 
                 // Pre-seed the dedupe cache with the state we expect REAPER
-                // to echo, so the echo is swallowed. Command-only variants
-                // (transport triggers, action IDs) are skipped — their
-                // feedback is genuinely new state we want to publish.
+                // to echo, so the echo is swallowed. Seeding happens at f32
+                // wire precision — that is what REAPER receives and echoes
+                // back. Command-only variants (transport triggers, action
+                // IDs) are skipped — their feedback is genuinely new state
+                // we want to publish.
                 if let Some((addr, _signal, value)) = reaper_to_action_parts(&reaper_msg) {
-                    cache.seed(&addr, value);
+                    cache.seed(&addr, to_wire_precision(value));
                 }
 
                 eprintln!("→ REAPER: {} {:?}", osc_msg.addr, osc_msg.args);
