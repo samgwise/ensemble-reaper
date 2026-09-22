@@ -159,11 +159,6 @@ impl FxRegistry {
             payload: entry.to_value(),
         }]
     }
-
-    /// Inspect a slot (used by tests and diagnostics).
-    pub fn entry(&self, track: u32, fx: u32) -> Option<&FxEntry> {
-        self.slots.get(&(track, fx))
-    }
 }
 
 /// Dedupe cache for values published to the hub.
@@ -196,11 +191,6 @@ impl ValueCache {
     /// swallows the echo feedback REAPER sends back once it applies.
     pub fn seed(&mut self, address: &str, value: Value) {
         self.last.insert(address.to_owned(), value);
-    }
-
-    /// Forget a value so the next equal value republishes.
-    pub fn invalidate(&mut self, address: &str) {
-        self.last.remove(address);
     }
 
     /// Forget all values under an address prefix (e.g. a cleared FX slot).
@@ -260,7 +250,7 @@ mod tests {
             other => panic!("Unexpected update: {other:?}"),
         }
         // The param name observed for the old plugin is gone.
-        assert!(reg.entry(2, 1).unwrap().params.is_empty());
+        assert!(reg.slots.get(&(2, 1)).unwrap().params.is_empty());
     }
 
     #[test]
@@ -293,7 +283,7 @@ mod tests {
             }
             other => panic!("Unexpected update: {other:?}"),
         }
-        assert!(reg.entry(2, 1).is_none());
+        assert!(!reg.slots.contains_key(&(2, 1)));
     }
 
     #[test]
@@ -311,7 +301,7 @@ mod tests {
         // Unchanged param name is a no-op.
         assert_eq!(reg.observe_param_name(2, 1, 0, "Freq 1").len(), 0);
 
-        let entry = reg.entry(2, 1).unwrap();
+        let entry = reg.slots.get(&(2, 1)).unwrap();
         assert_eq!(entry.params.get(&0).unwrap(), "Freq 1");
     }
 
@@ -319,7 +309,7 @@ mod tests {
     fn param_names_for_unknown_slot_are_ignored() {
         let mut reg = FxRegistry::new();
         assert_eq!(reg.observe_param_name(2, 1, 0, "Freq 1").len(), 0);
-        assert!(reg.entry(2, 1).is_none());
+        assert!(!reg.slots.contains_key(&(2, 1)));
     }
 
     #[test]
@@ -348,17 +338,16 @@ mod tests {
     }
 
     #[test]
-    fn invalidation_and_prefix_clearing_allow_republish() {
+    fn prefix_clearing_allows_republish() {
         let mut cache = ValueCache::new();
         cache.check_and_store("/a", Value::Integer(1));
         cache.check_and_store("/fx/1/param/0/value", Value::Float(0.5.into()));
         cache.check_and_store("/fx/1/param/1/value", Value::Float(0.25.into()));
 
-        cache.invalidate("/a");
-        assert!(cache.check_and_store("/a", Value::Integer(1)));
-
         cache.clear_prefix("/fx/1/");
+        // Values under the cleared prefix republish; unrelated ones stay deduped.
         assert!(cache.check_and_store("/fx/1/param/0/value", Value::Float(0.5.into())));
         assert!(cache.check_and_store("/fx/1/param/1/value", Value::Float(0.25.into())));
+        assert!(!cache.check_and_store("/a", Value::Integer(1)));
     }
 }

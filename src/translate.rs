@@ -9,7 +9,7 @@
 //! - **Stream** — high-rate, best-effort data (the beat position).
 //! - **Event** — one-shot triggers (transport commands, action IDs).
 
-use ensemble_core::protocol::{action, SignalType, Value, WireMessage};
+use ensemble_core::protocol::{SignalType, Value};
 
 use crate::reaper::{ReaperMessage, TransportCommand};
 
@@ -26,11 +26,13 @@ pub fn fx_param_value_address(track: u32, fx: u32, param: u32) -> String {
     format!("{ENS_ROOT}/track/{track}/fx/{fx}/param/{param}/value")
 }
 
-/// Convert REAPER feedback into an Ensemble action for the hub.
+/// Convert REAPER feedback into the components of an Ensemble action:
+/// the address, the signal type and the payload. The caller supplies the
+/// timestamp at the send site (hub-synced time).
 ///
 /// Returns `None` for command-only variants (transport commands, action IDs)
 /// which have no REAPER-side feedback representation.
-pub fn reaper_to_action(msg: &ReaperMessage, timestamp: f64) -> Option<WireMessage> {
+pub fn reaper_to_action_parts(msg: &ReaperMessage) -> Option<(String, SignalType, Value)> {
     let mut address = String::from(ENS_ROOT);
     let (signal, payload) = match msg {
         ReaperMessage::Playing(on) => {
@@ -112,7 +114,7 @@ pub fn reaper_to_action(msg: &ReaperMessage, timestamp: f64) -> Option<WireMessa
         // Command-only variants are sent to REAPER, never published.
         ReaperMessage::Transport(_) | ReaperMessage::Action(_) => return None,
     };
-    Some(action(&address, signal, timestamp, payload))
+    Some((address, signal, payload))
 }
 
 /// Convert an Ensemble action (address + payload) into a REAPER message.
@@ -221,42 +223,32 @@ mod tests {
 
     #[test]
     fn transport_state_becomes_param() {
-        let a = reaper_to_action(&ReaperMessage::Playing(true), 0.0).unwrap();
-        let map = match &a.payload {
-            Value::Map(m) => m.clone(),
-            _ => panic!("Expected Map payload"),
-        };
-        let addr = ensemble_core::protocol::get_string(&map, "address").unwrap();
+        let (addr, signal, payload) = reaper_to_action_parts(&ReaperMessage::Playing(true)).unwrap();
         assert_eq!(addr, "/reaper/transport/playing");
+        assert_eq!(signal, SignalType::Param);
+        assert_eq!(payload, Value::Bool(true));
     }
 
     #[test]
     fn beat_position_becomes_stream() {
-        let a = reaper_to_action(&ReaperMessage::PositionBeat(8.5), 0.0).unwrap();
-        let map = match &a.payload {
-            Value::Map(m) => m.clone(),
-            _ => panic!("Expected Map payload"),
-        };
-        let addr = ensemble_core::protocol::get_string(&map, "address").unwrap();
+        let (addr, signal, _) = reaper_to_action_parts(&ReaperMessage::PositionBeat(8.5)).unwrap();
         assert_eq!(addr, "/reaper/transport/position/beat");
+        assert_eq!(signal, SignalType::Stream);
     }
 
     #[test]
     fn fx_param_value_address_mapping() {
-        let msg = ReaperMessage::FxParamValue { track: 3, fx: 1, param: 6, value: 0.42 };
-        let a = reaper_to_action(&msg, 0.0).unwrap();
-        let map = match &a.payload {
-            Value::Map(m) => m.clone(),
-            _ => panic!("Expected Map payload"),
-        };
-        let addr = ensemble_core::protocol::get_string(&map, "address").unwrap();
+        let msg = ReaperMessage::FxParamValue { track: 3, fx: 1, param: 6, value: 0.25 };
+        let (addr, signal, payload) = reaper_to_action_parts(&msg).unwrap();
         assert_eq!(addr, "/reaper/track/3/fx/1/param/6/value");
+        assert_eq!(signal, SignalType::Param);
+        assert_eq!(payload, Value::Float(0.25.into()));
     }
 
     #[test]
     fn command_variants_are_not_published() {
-        assert!(reaper_to_action(&ReaperMessage::Transport(TransportCommand::Play), 0.0).is_none());
-        assert!(reaper_to_action(&ReaperMessage::Action(40757), 0.0).is_none());
+        assert!(reaper_to_action_parts(&ReaperMessage::Transport(TransportCommand::Play)).is_none());
+        assert!(reaper_to_action_parts(&ReaperMessage::Action(40757)).is_none());
     }
 
     #[test]
