@@ -16,6 +16,16 @@ use crate::reaper::{ReaperMessage, TransportCommand};
 /// The Ensemble namespace root for all REAPER addresses.
 pub const ENS_ROOT: &str = "/reaper";
 
+/// Address of an FX slot's `info` Param (the plugin registry entry).
+pub fn fx_info_address(track: u32, fx: u32) -> String {
+    format!("{ENS_ROOT}/track/{track}/fx/{fx}/info")
+}
+
+/// Address of an FX parameter's value Param.
+pub fn fx_param_value_address(track: u32, fx: u32, param: u32) -> String {
+    format!("{ENS_ROOT}/track/{track}/fx/{fx}/param/{param}/value")
+}
+
 /// Convert REAPER feedback into an Ensemble action for the hub.
 ///
 /// Returns `None` for command-only variants (transport commands, action IDs)

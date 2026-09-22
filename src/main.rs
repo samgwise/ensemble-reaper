@@ -18,7 +18,9 @@
 // variant has a runtime consumer.
 #![allow(dead_code)]
 
+mod osc;
 mod reaper;
+mod registry;
 mod translate;
 
 fn main() {
