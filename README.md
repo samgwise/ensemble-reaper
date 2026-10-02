@@ -5,12 +5,11 @@ exposes REAPER's transport, tracks and FX parameters as Ensemble actions, and
 forwards Ensemble actions to REAPER as OSC commands.
 
 ```text
-Ensemble hub                 ensemble-reaper                REAPER
-┌──────────────┐   TCP    ┌───────────────────┐   UDP   ┌─────────────┐
-│ voices, clock,│◀───────▶│ /reaper/** ↔ OSC  │◀───────▶│ OSC device  │
-│ routing, replay│        │ translation+registry│       │ (pattern    │
-└──────────────┘          └───────────────────┘         │ config)     │
-                                                        └─────────────┘
+   Ensemble hub                  ensemble-reaper                      REAPER
+┌─────────────────┐   TCP    ┌──────────────────────┐   UDP    ┌──────────────────┐
+│ voices, clock,  │<────────>│ /reaper/** OSC       │<────────>│ OSC device       │
+│ routing, replay │          │ translation+registry │          │ (pattern config) │
+└─────────────────┘          └──────────────────────┘          └──────────────────┘
 ```
 
 ## Building
