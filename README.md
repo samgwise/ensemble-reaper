@@ -18,8 +18,10 @@ forwards Ensemble actions to REAPER as OSC commands.
 cargo build --release
 ```
 
-Requires the `ensemble` workspace checked out as a sibling directory
-(`../ensemble`), since the client crates are linked by path.
+Released builds resolve the Ensemble crates from crates.io. For local
+development, check out the
+[`ensemble`](https://github.com/samgwise/ensemble) workspace as a sibling
+directory (`../ensemble`) — the path dependencies pick it up automatically.
 
 ## Running
 

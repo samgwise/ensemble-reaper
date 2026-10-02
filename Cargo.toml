@@ -4,7 +4,11 @@ version = "0.1.0"
 edition = "2021"
 license = "MIT"
 description = "REAPER OSC bridge for Ensemble — exposes REAPER transport, tracks and FX parameters as Ensemble actions"
-publish = false
+repository = "https://github.com/samgwise/ensemble-reaper"
+homepage = "https://github.com/samgwise/ensemble-reaper"
+readme = "README.md"
+keywords = ["music", "osc", "reaper", "daw", "real-time"]
+categories = ["multimedia::audio", "command-line-utilities"]
 
 [[bin]]
 name = "ensemble-reaper"
